@@ -1,0 +1,267 @@
+{
+  "id": "run_536218ffca58",
+  "status": "completed",
+  "created_by": "requester:demo",
+  "user_message": "Refund ORD-1002, wrong colour",
+  "created_at": "2026-10-30T07:34:54.721269Z",
+  "updated_at": "2026-10-30T07:34:56.735239Z",
+  "steps": [
+    {
+      "kind": "user_input",
+      "at": "2026-10-30T07:34:54.721279Z",
+      "data": {
+        "text": "Refund ORD-1002, wrong colour",
+        "user": "requester:demo"
+      }
+    },
+    {
+      "kind": "llm_call",
+      "at": "2026-10-30T07:34:54.722112Z",
+      "data": {
+        "model": "mock",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_69daab74",
+            "name": "lookup_order",
+            "arguments": {
+              "order_id": "ORD-1002"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "tool_call",
+      "at": "2026-10-30T07:34:54.722131Z",
+      "data": {
+        "id": "call_69daab74",
+        "tool": "lookup_order",
+        "arguments": {
+          "order_id": "ORD-1002"
+        }
+      }
+    },
+    {
+      "kind": "tool_result",
+      "at": "2026-10-30T07:34:54.722218Z",
+      "data": {
+        "id": "call_69daab74",
+        "tool": "lookup_order",
+        "arguments": {
+          "order_id": "ORD-1002"
+        },
+        "output": {
+          "ok": true,
+          "data": {
+            "order_id": "ORD-1002",
+            "customer_id": "C-002",
+            "item": "Phone case",
+            "amount": "45.50",
+            "currency": "USD",
+            "status": "delivered",
+            "purchased_at": "2026-10-21T09:00:00Z",
+            "delivered_at": "2026-10-25T11:00:00Z",
+            "last_synced_at": "2026-10-30T08:00:00Z"
+          }
+        },
+        "duration_ms": 0
+      }
+    },
+    {
+      "kind": "llm_call",
+      "at": "2026-10-30T07:34:54.723126Z",
+      "data": {
+        "model": "mock",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_d846b465",
+            "name": "lookup_customer",
+            "arguments": {
+              "customer_id": "C-002"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "tool_call",
+      "at": "2026-10-30T07:34:54.723144Z",
+      "data": {
+        "id": "call_d846b465",
+        "tool": "lookup_customer",
+        "arguments": {
+          "customer_id": "C-002"
+        }
+      }
+    },
+    {
+      "kind": "tool_result",
+      "at": "2026-10-30T07:34:54.723221Z",
+      "data": {
+        "id": "call_d846b465",
+        "tool": "lookup_customer",
+        "arguments": {
+          "customer_id": "C-002"
+        },
+        "output": {
+          "ok": true,
+          "data": {
+            "customer_id": "C-002",
+            "name": "Bilal Ahmed",
+            "email": "b***@example.com",
+            "tier": "standard",
+            "refunds_last_90d": 1
+          }
+        },
+        "duration_ms": 0
+      }
+    },
+    {
+      "kind": "llm_call",
+      "at": "2026-10-30T07:34:54.724054Z",
+      "data": {
+        "model": "mock",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_5dfa2711",
+            "name": "check_refund_policy",
+            "arguments": {
+              "order_id": "ORD-1002"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "tool_call",
+      "at": "2026-10-30T07:34:54.724073Z",
+      "data": {
+        "id": "call_5dfa2711",
+        "tool": "check_refund_policy",
+        "arguments": {
+          "order_id": "ORD-1002"
+        }
+      }
+    },
+    {
+      "kind": "tool_result",
+      "at": "2026-10-30T07:34:54.724169Z",
+      "data": {
+        "id": "call_5dfa2711",
+        "tool": "check_refund_policy",
+        "arguments": {
+          "order_id": "ORD-1002"
+        },
+        "output": {
+          "ok": true,
+          "data": {
+            "order_id": "ORD-1002",
+            "eligible": true,
+            "max_refund": "45.50",
+            "reasons": [
+              "meets refund policy"
+            ]
+          }
+        },
+        "duration_ms": 0
+      }
+    },
+    {
+      "kind": "llm_call",
+      "at": "2026-10-30T07:34:54.725093Z",
+      "data": {
+        "model": "mock",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_16c0a274",
+            "name": "issue_refund",
+            "arguments": {
+              "order_id": "ORD-1002",
+              "amount": "45.50",
+              "reason": "Refund ORD-1002, wrong colour"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "tool_call",
+      "at": "2026-10-30T07:34:54.725113Z",
+      "data": {
+        "id": "call_16c0a274",
+        "tool": "issue_refund",
+        "arguments": {
+          "order_id": "ORD-1002",
+          "amount": "45.50",
+          "reason": "Refund ORD-1002, wrong colour"
+        }
+      }
+    },
+    {
+      "kind": "approval_requested",
+      "at": "2026-10-30T07:34:54.725124Z",
+      "data": {
+        "tool": "issue_refund",
+        "arguments": {
+          "order_id": "ORD-1002",
+          "amount": "45.50",
+          "reason": "Refund ORD-1002, wrong colour"
+        }
+      }
+    },
+    {
+      "kind": "approval_decision",
+      "at": "2026-10-30T07:34:54.725676Z",
+      "data": {
+        "approved": true,
+        "operator": "operator:demo",
+        "reason": ""
+      }
+    },
+    {
+      "kind": "tool_result",
+      "at": "2026-10-30T07:34:56.734150Z",
+      "data": {
+        "id": "call_16c0a274",
+        "tool": "issue_refund",
+        "arguments": {
+          "order_id": "ORD-1002",
+          "amount": "45.50",
+          "reason": "Refund ORD-1002, wrong colour"
+        },
+        "output": {
+          "ok": false,
+          "error": {
+            "code": "timeout",
+            "message": "'issue_refund' timed out after 2.0s",
+            "retryable": true
+          }
+        },
+        "duration_ms": 2008
+      }
+    },
+    {
+      "kind": "llm_call",
+      "at": "2026-10-30T07:34:56.735205Z",
+      "data": {
+        "model": "mock",
+        "content": "The refund for ORD-1002 could not be completed: the payment provider did not respond in time, so the outcome is unknown. Do not retry; finance must reconcile with the provider first.",
+        "tool_calls": []
+      }
+    },
+    {
+      "kind": "final_answer",
+      "at": "2026-10-30T07:34:56.735237Z",
+      "data": {
+        "text": "The refund for ORD-1002 could not be completed: the payment provider did not respond in time, so the outcome is unknown. Do not retry; finance must reconcile with the provider first."
+      }
+    }
+  ],
+  "pending_action": null,
+  "final_answer": "The refund for ORD-1002 could not be completed: the payment provider did not respond in time, so the outcome is unknown. Do not retry; finance must reconcile with the provider first.",
+  "error": null
+}

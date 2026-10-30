@@ -1,0 +1,72 @@
+# Pull-request / main-branch gate. Fast, deterministic, no secrets, no paid model calls.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen
+      - name: Unit, integration, API and data-validation tests
+        run: >
+          uv run pytest tests -m "not e2e"
+          --cov=app --cov-report=term --cov-report=xml:reports/coverage.xml
+          --cov-fail-under=90 --junitxml=reports/junit.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-reports
+          path: reports/
+
+  evals-mock:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen
+      - name: Scorer tests + eval gate (deterministic model, regression vs baseline)
+        run: uv run pytest evals -m "not live"
+      - name: Eval report
+        if: always()
+        run: uv run python -m evals.run_evals --mode mock --trials 3 && cat reports/eval_mock.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-report-mock
+          path: reports/eval_mock.*
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen
+      - run: uv run playwright install --with-deps chromium
+      - run: uv run pytest tests/e2e --screenshot only-on-failure --tracing retain-on-failure --output reports/playwright
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: e2e-artifacts
+          path: |
+            reports/screenshots/
+            reports/playwright/

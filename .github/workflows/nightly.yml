@@ -1,0 +1,43 @@
+# Scheduled regression cycle: real model, multiple trials, variance tracking.
+name: nightly-regression
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+    inputs:
+      trials:
+        description: "Trials per case"
+        default: "5"
+
+jobs:
+  full-suite:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen
+      - run: uv run playwright install --with-deps chromium
+      - run: uv run pytest -m "not live" --cov=app --junitxml=reports/junit.xml
+
+  live-evals:
+    runs-on: ubuntu-latest
+    env:
+      OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+      OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - run: uv sync --frozen
+      - name: Live evaluation (tolerates variance, fails on regressions or safety misses)
+        run: >
+          uv run python -m evals.run_evals --mode live
+          --trials ${{ github.event.inputs.trials || '3' }} --threshold 0.67
+      - if: always()
+        run: cat reports/eval_live.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eval-report-live-${{ github.run_number }}
+          path: reports/eval_live.*
+          retention-days: 90

@@ -1,0 +1,268 @@
+{
+  "id": "run_e9bca3475ba6",
+  "status": "completed",
+  "created_by": "requester:demo",
+  "user_message": "Please refund order ORD-1001, it arrived damaged.",
+  "created_at": "2026-10-30T07:34:54.712933Z",
+  "updated_at": "2026-10-30T07:34:54.720148Z",
+  "steps": [
+    {
+      "kind": "user_input",
+      "at": "2026-10-30T07:34:54.713225Z",
+      "data": {
+        "text": "Please refund order ORD-1001, it arrived damaged.",
+        "user": "requester:demo"
+      }
+    },
+    {
+      "kind": "llm_call",
+      "at": "2026-10-30T07:34:54.714966Z",
+      "data": {
+        "model": "mock",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_48679764",
+            "name": "lookup_order",
+            "arguments": {
+              "order_id": "ORD-1001"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "tool_call",
+      "at": "2026-10-30T07:34:54.714994Z",
+      "data": {
+        "id": "call_48679764",
+        "tool": "lookup_order",
+        "arguments": {
+          "order_id": "ORD-1001"
+        }
+      }
+    },
+    {
+      "kind": "tool_result",
+      "at": "2026-10-30T07:34:54.715280Z",
+      "data": {
+        "id": "call_48679764",
+        "tool": "lookup_order",
+        "arguments": {
+          "order_id": "ORD-1001"
+        },
+        "output": {
+          "ok": true,
+          "data": {
+            "order_id": "ORD-1001",
+            "customer_id": "C-001",
+            "item": "Wireless headphones",
+            "amount": "129.99",
+            "currency": "USD",
+            "status": "delivered",
+            "purchased_at": "2026-10-15T10:00:00Z",
+            "delivered_at": "2026-10-20T14:30:00Z",
+            "last_synced_at": "2026-10-30T08:00:00Z"
+          }
+        },
+        "duration_ms": 0
+      }
+    },
+    {
+      "kind": "llm_call",
+      "at": "2026-10-30T07:34:54.716265Z",
+      "data": {
+        "model": "mock",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_10eb2ffb",
+            "name": "lookup_customer",
+            "arguments": {
+              "customer_id": "C-001"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "tool_call",
+      "at": "2026-10-30T07:34:54.716289Z",
+      "data": {
+        "id": "call_10eb2ffb",
+        "tool": "lookup_customer",
+        "arguments": {
+          "customer_id": "C-001"
+        }
+      }
+    },
+    {
+      "kind": "tool_result",
+      "at": "2026-10-30T07:34:54.716429Z",
+      "data": {
+        "id": "call_10eb2ffb",
+        "tool": "lookup_customer",
+        "arguments": {
+          "customer_id": "C-001"
+        },
+        "output": {
+          "ok": true,
+          "data": {
+            "customer_id": "C-001",
+            "name": "Alice Morgan",
+            "email": "a***@example.com",
+            "tier": "gold",
+            "refunds_last_90d": 0
+          }
+        },
+        "duration_ms": 0
+      }
+    },
+    {
+      "kind": "llm_call",
+      "at": "2026-10-30T07:34:54.717371Z",
+      "data": {
+        "model": "mock",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_298e86cc",
+            "name": "check_refund_policy",
+            "arguments": {
+              "order_id": "ORD-1001"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "tool_call",
+      "at": "2026-10-30T07:34:54.717390Z",
+      "data": {
+        "id": "call_298e86cc",
+        "tool": "check_refund_policy",
+        "arguments": {
+          "order_id": "ORD-1001"
+        }
+      }
+    },
+    {
+      "kind": "tool_result",
+      "at": "2026-10-30T07:34:54.717525Z",
+      "data": {
+        "id": "call_298e86cc",
+        "tool": "check_refund_policy",
+        "arguments": {
+          "order_id": "ORD-1001"
+        },
+        "output": {
+          "ok": true,
+          "data": {
+            "order_id": "ORD-1001",
+            "eligible": true,
+            "max_refund": "129.99",
+            "reasons": [
+              "meets refund policy"
+            ]
+          }
+        },
+        "duration_ms": 0
+      }
+    },
+    {
+      "kind": "llm_call",
+      "at": "2026-10-30T07:34:54.718373Z",
+      "data": {
+        "model": "mock",
+        "content": null,
+        "tool_calls": [
+          {
+            "id": "call_0cca23e2",
+            "name": "issue_refund",
+            "arguments": {
+              "order_id": "ORD-1001",
+              "amount": "129.99",
+              "reason": "Please refund order ORD-1001, it arrived damaged."
+            }
+          }
+        ]
+      }
+    },
+    {
+      "kind": "tool_call",
+      "at": "2026-10-30T07:34:54.718393Z",
+      "data": {
+        "id": "call_0cca23e2",
+        "tool": "issue_refund",
+        "arguments": {
+          "order_id": "ORD-1001",
+          "amount": "129.99",
+          "reason": "Please refund order ORD-1001, it arrived damaged."
+        }
+      }
+    },
+    {
+      "kind": "approval_requested",
+      "at": "2026-10-30T07:34:54.718421Z",
+      "data": {
+        "tool": "issue_refund",
+        "arguments": {
+          "order_id": "ORD-1001",
+          "amount": "129.99",
+          "reason": "Please refund order ORD-1001, it arrived damaged."
+        }
+      }
+    },
+    {
+      "kind": "approval_decision",
+      "at": "2026-10-30T07:34:54.719016Z",
+      "data": {
+        "approved": true,
+        "operator": "operator:demo",
+        "reason": ""
+      }
+    },
+    {
+      "kind": "tool_result",
+      "at": "2026-10-30T07:34:54.719212Z",
+      "data": {
+        "id": "call_0cca23e2",
+        "tool": "issue_refund",
+        "arguments": {
+          "order_id": "ORD-1001",
+          "amount": "129.99",
+          "reason": "Please refund order ORD-1001, it arrived damaged."
+        },
+        "output": {
+          "ok": true,
+          "data": {
+            "order_id": "ORD-1001",
+            "refund_id": "RF-000001",
+            "status": "succeeded",
+            "amount": "129.99"
+          }
+        },
+        "duration_ms": 0
+      }
+    },
+    {
+      "kind": "llm_call",
+      "at": "2026-10-30T07:34:54.720110Z",
+      "data": {
+        "model": "mock",
+        "content": "Refund RF-000001 for $129.99 on order ORD-1001 (Wireless headphones) was issued successfully.",
+        "tool_calls": []
+      }
+    },
+    {
+      "kind": "final_answer",
+      "at": "2026-10-30T07:34:54.720145Z",
+      "data": {
+        "text": "Refund RF-000001 for $129.99 on order ORD-1001 (Wireless headphones) was issued successfully."
+      }
+    }
+  ],
+  "pending_action": null,
+  "final_answer": "Refund RF-000001 for $129.99 on order ORD-1001 (Wireless headphones) was issued successfully.",
+  "error": null
+}
