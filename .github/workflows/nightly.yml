@@ -24,7 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-      OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'meta-llama/llama-3.3-70b-instruct:free' }}
+      OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'nvidia/nemotron-3.5-super-vl:free' }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5

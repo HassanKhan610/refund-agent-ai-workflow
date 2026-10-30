@@ -29,7 +29,7 @@ def _parse_api_keys(raw: str) -> dict[str, str]:
 class Settings:
     llm_mode: str = "mock"
     openrouter_api_key: str = ""
-    openrouter_model: str = "meta-llama/llama-3.3-70b-instruct:free"
+    openrouter_model: str = "nvidia/nemotron-3.5-super-vl:free"
     llm_timeout_seconds: float = 30.0
     tool_timeout_seconds: float = 2.0
     max_agent_steps: int = 8
