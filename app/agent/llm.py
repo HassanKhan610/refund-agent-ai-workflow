@@ -1,4 +1,5 @@
-"""LLM clients behind one interface: a deterministic mock and OpenRouter (OpenAI-compatible)."""
+"""LLM clients behind one interface: a deterministic mock and any OpenAI-compatible API
+(Google Gemini or OpenRouter)."""
 
 from __future__ import annotations
 
@@ -54,25 +55,36 @@ class LLMClient(Protocol):
     ) -> LLMResponse: ...
 
 
-# --------------------------------------------------------------------------- OpenRouter
+# --------------------------------------------------------------------------- live providers
+
+PROVIDER_URLS = {
+    "gemini": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+    "openrouter": "https://openrouter.ai/api/v1/chat/completions",
+}
 
 
-class OpenRouterClient:
-    URL = "https://openrouter.ai/api/v1/chat/completions"
+class ChatCompletionsClient:
+    """OpenAI-style /chat/completions with function calling. Gemini and OpenRouter both speak it."""
+
     RETRY_STATUS = {408, 429, 500, 502, 503, 504}
+    MAX_RETRY_AFTER = 20.0
 
     def __init__(
         self,
+        provider: str,
         api_key: str,
         model: str,
         timeout: float,
-        max_retries: int = 2,
+        max_retries: int = 3,
         backoff_seconds: float = 1.0,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
+        if provider not in PROVIDER_URLS:
+            raise ValueError(f"unknown LLM_PROVIDER '{provider}'")
         if not api_key:
-            raise ValueError("OPENROUTER_API_KEY is required when LLM_MODE=live")
-        self.name = f"openrouter:{model}"
+            raise ValueError(f"an API key for '{provider}' is required when LLM_MODE=live")
+        self.name = f"{provider}:{model}"
+        self.URL = PROVIDER_URLS[provider]
         self._model = model
         self._max_retries = max_retries
         self._backoff = backoff_seconds
@@ -86,6 +98,7 @@ class OpenRouterClient:
         payload = {"model": self._model, "messages": messages, "tools": tools, "temperature": 0}
         last_error = "unknown error"
         for attempt in range(self._max_retries + 1):
+            retry_after: float | None = None
             try:
                 resp = self._http.post(self.URL, json=payload)
             except httpx.TimeoutException:
@@ -98,9 +111,12 @@ class OpenRouterClient:
                 last_error = f"provider returned HTTP {resp.status_code}"
                 if resp.status_code not in self.RETRY_STATUS:
                     break
+                retry_after = _retry_after(resp)
             log.warning("llm_retry", extra={"attempt": attempt, "error": last_error})
             if attempt < self._max_retries:
-                time.sleep(min(self._backoff * 2**attempt, 8))
+                # Honour the provider's Retry-After on 429s (free tiers send it), else back off.
+                delay = retry_after if retry_after is not None else self._backoff * 2**attempt
+                time.sleep(min(delay, self.MAX_RETRY_AFTER))
         raise LLMError(last_error)
 
     @staticmethod
@@ -272,9 +288,17 @@ def _call(name: str, args: dict[str, Any]) -> LLMResponse:
     return LLMResponse(tool_calls=[ToolCall(name=name, arguments=args)])
 
 
+def _retry_after(resp: httpx.Response) -> float | None:
+    try:
+        return float(resp.headers["retry-after"])
+    except (KeyError, ValueError):
+        return None
+
+
 def build_llm(settings: Settings) -> LLMClient:
     if settings.llm_mode == "live":
-        return OpenRouterClient(
-            settings.openrouter_api_key, settings.openrouter_model, settings.llm_timeout_seconds
+        api_key, model = settings.live_llm()
+        return ChatCompletionsClient(
+            settings.llm_provider, api_key, model, settings.llm_timeout_seconds
         )
     return MockLLM()

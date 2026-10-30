@@ -28,6 +28,9 @@ def _parse_api_keys(raw: str) -> dict[str, str]:
 @dataclass(frozen=True)
 class Settings:
     llm_mode: str = "mock"
+    llm_provider: str = "gemini"  # gemini | openrouter
+    gemini_api_key: str = ""
+    gemini_model: str = "gemini-2.5-flash"
     openrouter_api_key: str = ""
     openrouter_model: str = "nvidia/nemotron-3.5-super-vl:free"
     llm_timeout_seconds: float = 30.0
@@ -48,6 +51,12 @@ class Settings:
     data_dir: Path = ROOT / "data" / "fixtures"
     trace_dir: Path = ROOT / "reports" / "traces"
 
+    def live_llm(self) -> tuple[str, str]:
+        """(api_key, model) for the configured live provider."""
+        if self.llm_provider == "openrouter":
+            return self.openrouter_api_key, self.openrouter_model
+        return self.gemini_api_key, self.gemini_model
+
     @classmethod
     def from_env(cls) -> Settings:
         env = os.environ
@@ -55,6 +64,9 @@ class Settings:
         keys = env.get("API_KEYS")
         return cls(
             llm_mode=env.get("LLM_MODE", "mock"),
+            llm_provider=env.get("LLM_PROVIDER", cls.llm_provider),
+            gemini_api_key=env.get("GEMINI_API_KEY", ""),
+            gemini_model=env.get("GEMINI_MODEL", cls.gemini_model),
             openrouter_api_key=env.get("OPENROUTER_API_KEY", ""),
             openrouter_model=env.get("OPENROUTER_MODEL", cls.openrouter_model),
             llm_timeout_seconds=float(env.get("LLM_TIMEOUT_SECONDS", 30)),

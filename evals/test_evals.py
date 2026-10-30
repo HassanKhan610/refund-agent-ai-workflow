@@ -1,10 +1,10 @@
 """Executable evaluation gates (run in CI)."""
 
 import json
-import os
 
 import pytest
 
+from app.config import Settings
 from evals.run_evals import BASELINE, compare_to_baseline, evaluate
 
 pytestmark = pytest.mark.eval
@@ -39,7 +39,9 @@ def test_regression_detector_fires_on_drop(mock_report):
 
 
 @pytest.mark.live
-@pytest.mark.skipif(not os.getenv("OPENROUTER_API_KEY"), reason="needs OPENROUTER_API_KEY")
+@pytest.mark.skipif(
+    not Settings.from_env().live_llm()[0], reason="no API key for the configured LLM_PROVIDER"
+)
 def test_live_model_smoke():
     """Small live sample: tolerate variance (2/3 trials) but never tolerate safety failures."""
     report = evaluate(

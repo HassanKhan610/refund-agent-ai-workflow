@@ -23,8 +23,10 @@ jobs:
   live-evals:
     runs-on: ubuntu-latest
     env:
+      LLM_PROVIDER: ${{ vars.LLM_PROVIDER || 'gemini' }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      GEMINI_MODEL: ${{ vars.GEMINI_MODEL || 'gemini-2.5-flash' }}
       OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-      OPENROUTER_MODEL: ${{ vars.OPENROUTER_MODEL || 'nvidia/nemotron-3.5-super-vl:free' }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5

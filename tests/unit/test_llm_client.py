@@ -1,31 +1,35 @@
-"""OpenRouter client against a fake HTTP transport: no network, every edge case reproducible."""
+"""Live LLM client against a fake HTTP transport: no network, every edge case reproducible."""
 
 import json
 
 import httpx
 import pytest
 
-from app.agent.llm import LLMError, OpenRouterClient
+from app.agent.llm import ChatCompletionsClient, LLMError
 
 
-def client_for(*responses):
+def client_for(*responses, provider="openrouter"):
     calls = []
+    urls = []
     queue = list(responses)
 
     def handler(request: httpx.Request):
         calls.append(json.loads(request.content))
+        urls.append(str(request.url))
         r = queue.pop(0)
         if isinstance(r, Exception):
             raise r
         return r
 
-    c = OpenRouterClient(
+    c = ChatCompletionsClient(
+        provider,
         "key",
         "some/model:free",
         timeout=1,
         backoff_seconds=0,
         transport=httpx.MockTransport(handler),
     )
+    c.urls = urls
     return c, calls
 
 
@@ -64,10 +68,10 @@ def test_retries_rate_limit_then_succeeds():
 
 
 def test_retries_timeouts_then_gives_up():
-    c, calls = client_for(*[httpx.ReadTimeout("slow")] * 3)
+    c, calls = client_for(*[httpx.ReadTimeout("slow")] * 4)
     with pytest.raises(LLMError, match="timed out"):
         c.complete([], [])
-    assert len(calls) == 3
+    assert len(calls) == 4  # 1 attempt + 3 retries
 
 
 def test_auth_error_is_not_retried():
@@ -91,4 +95,24 @@ def test_unparseable_tool_arguments_are_passed_on_for_validation():
 
 def test_missing_key_is_rejected_at_startup():
     with pytest.raises(ValueError):
-        OpenRouterClient("", "m", timeout=1)
+        ChatCompletionsClient("gemini", "", "m", timeout=1)
+
+
+def test_unknown_provider_is_rejected():
+    with pytest.raises(ValueError, match="unknown"):
+        ChatCompletionsClient("acme", "key", "m", timeout=1)
+
+
+def test_gemini_uses_google_openai_compatible_endpoint():
+    c, _ = client_for(ok({"content": "hi"}), provider="gemini")
+    c.complete([], [])
+    assert c.urls[0].startswith("https://generativelanguage.googleapis.com/v1beta/openai/")
+    assert c.name.startswith("gemini:")
+
+
+def test_rate_limit_honours_retry_after(monkeypatch):
+    slept = []
+    monkeypatch.setattr("app.agent.llm.time.sleep", slept.append)
+    c, _ = client_for(httpx.Response(429, headers={"Retry-After": "7"}), ok({"content": "ok"}))
+    assert c.complete([], []).content == "ok"
+    assert slept == [7.0]

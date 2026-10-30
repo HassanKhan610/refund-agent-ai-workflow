@@ -99,7 +99,9 @@ def evaluate(mode: str, trials: int, threshold: float, only: list[str] | None = 
             "mode": mode,
             "trials": trials,
             "threshold": threshold,
-            "model": "mock" if mode == "mock" else settings.openrouter_model,
+            "model": "mock"
+            if mode == "mock"
+            else f"{settings.llm_provider}:{settings.live_llm()[1]}",
             "generated_at": datetime.now(UTC).isoformat(),
             "cases": len(results),
         },

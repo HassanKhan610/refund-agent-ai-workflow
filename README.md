@@ -9,7 +9,7 @@ deterministic business rules, guarded tools, explicit state, visible failures, a
 and evaluations.
 
 ```
-137 tests passing + 1 live-model test skipped without a key (unit · integration · API · data validation · browser) · 98% line coverage on app/
+140 tests passing + 1 live-model test skipped without a key (unit · integration · API · data validation · browser) · 98% line coverage on app/
 23-case AI eval suite × 3 trials · 6 criteria · 100% pass on the deterministic model
 ```
 
@@ -28,16 +28,19 @@ make evals              # AI evaluation suite, mock model, 3 trials -> reports/e
 ```
 
 No API key is needed. By default the agent runs on a **deterministic mock model**, so everything
-is reproducible and free. To use a real model through OpenRouter:
+is reproducible and free. To use a real model (Google Gemini free tier by default):
 
 ```bash
-cp .env.example .env    # set LLM_MODE=live and OPENROUTER_API_KEY
+cp .env.example .env    # set LLM_MODE=live and GEMINI_API_KEY (free: https://aistudio.google.com/apikey)
 make run                # the console now uses the live model
 make evals-live         # same eval dataset against the live model, threshold 0.67
 ```
 
-Pick any free OpenRouter model that supports **tool calling**
-([filter](https://openrouter.ai/models?supported_parameters=tools)) and set it in `OPENROUTER_MODEL`.
+The live client speaks the OpenAI-compatible `/chat/completions` API, so switching providers is
+configuration only. Set `LLM_PROVIDER=openrouter` with `OPENROUTER_API_KEY` and `OPENROUTER_MODEL`
+(any model that supports [tool calling](https://openrouter.ai/models?supported_parameters=tools)).
+Free tiers rate-limit (HTTP 429). The client honors `Retry-After`, retries with backoff, and then
+fails the run safely.
 
 ### Try it in the console
 
@@ -62,7 +65,7 @@ Switch *Role* to `requester` to see authorization: requesters can't approve, and
 flowchart LR
   UI[Operator console<br/>static HTML/JS] -->|X-API-Key| API[FastAPI<br/>app/api]
   API --> AG[Agent orchestrator<br/>app/agent]
-  AG -->|messages + tool schemas| LLM[(LLMClient<br/>Mock or OpenRouter)]
+  AG -->|messages + tool schemas| LLM[(LLMClient<br/>Mock · Gemini · OpenRouter)]
   AG --> GR[Guardrails<br/>input / output]
   AG --> REG[Tool registry<br/>validation · timeout · typed errors · approval gate]
   REG --> T[Refund tools<br/>app/tools]
@@ -155,7 +158,7 @@ policy, the approval gate, side-effect safety and failure handling.
 
 | Layer | Where | What it proves | Count |
 |---|---|---|---|
-| **Unit** | `tests/unit/` | Each policy rule and boundary; registry validation, timeout, crash containment, approval gate; every gateway failure mode; atomic approval under concurrency; guardrails; OpenRouter client parsing/retry/no-retry (fake HTTP transport) | 53 |
+| **Unit** | `tests/unit/` | Each policy rule and boundary; registry validation, timeout, crash containment, approval gate; every gateway failure mode; atomic approval under concurrency; guardrails; live LLM client parsing, provider URLs, retry/`Retry-After`/no-retry (fake HTTP transport) | 56 |
 | **Integration** | `tests/integration/` | Agent + tools + policy + state wired together (only LLM and payment provider faked): approve, reject, double-decision, partial amount, ineligible, status question, stale/malformed data, gateway timeout/503/bad receipt, model outage, malformed model tool call, injection, step budget, **hallucinating model**, **model trying to skip approval** | 20 |
 | **API** | `tests/api/` | Success flows, `422` validation (6 payload shapes), `401`/`403`/ownership, `404`, `409`, injected faults surfacing in the run (not as HTTP errors), clean `500` with no secret leakage, request-ID propagation | 28 |
 | **Data validation** | `tests/data/` | Every source record is either loaded or quarantined; cents → exact `Decimal` dollars; UTC timestamps; strings never coerced into amounts; naive timestamps rejected; **API output matches source records**; display formatting; stale flag; quarantined records never shown | 17 |
@@ -173,7 +176,7 @@ machine, HTTP stack and browser.
 ## AI evaluation
 
 Tests check that the code works. Evals measure **the behavior of the whole agent**, LLM included,
-on a fixed dataset. The same dataset runs against the mock or any OpenRouter model.
+on a fixed dataset. The same dataset runs against the mock, Gemini or any OpenRouter model.
 
 - **Dataset:** `evals/dataset.jsonl`, 23 cases across `happy_path`, `policy`, `relevance`,
   `failure` and `safety`. Each case declares its setup (injected gateway or model fault, operator
@@ -219,7 +222,7 @@ of the first failing trial per case). A sample is in [`reports/sample/eval_mock.
 | Unavailable dependency | Gateway `unavailable` (503) | "Could not be completed, no money moved"; order unchanged | unit → e2e, eval |
 | Timeout | Gateway hangs past the 2s tool timeout | "Outcome unknown, reconcile before retry"; **not retried** | unit, integration, API, eval |
 | Invalid tool response | Gateway returns 200 with a malformed receipt | Receipt validation fails → `invalid_response`; not reported as success | unit, integration, eval |
-| Model outage | `MockLLM(fault="unavailable")` / OpenRouter 5xx after retries | Run `FAILED` with an explicit "no refund issued" | integration, API, eval |
+| Model outage | `MockLLM(fault="unavailable")` / provider 429/5xx after retries | Run `FAILED` with an explicit "no refund issued" | integration, API, eval |
 | Malformed model output | Bad tool arguments / unparseable JSON | Registry returns `invalid_arguments`; model corrects and continues | unit, integration, eval |
 | Unsafe request | Injection, bulk refund, PII export | `BLOCKED` before any tool | unit, integration, API, eval |
 | Hallucinated success | Model claims a refund ID no tool produced | Output guardrail replaces the answer and flags it for review | integration |
@@ -266,7 +269,7 @@ flaky, and a flaky gate gets ignored.
   aren't a complete defense against prompt injection. The policy re-check and approval gate are
   the real safety net.
 - Rule-based evals measure facts, not tone or helpfulness. The live-model eval hasn't been run in
-  CI here because it needs the client's OpenRouter key in repository secrets.
+  CI here because it needs an API key in repository secrets (`GEMINI_API_KEY`).
 - Static API keys; no rate limiting; no audit-log export.
 
 ## What I'd add with more time
