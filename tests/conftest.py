@@ -36,3 +36,15 @@ def registry(repo, gateway, fast_settings):
     from app.tools.refund_tools import build_registry
 
     return build_registry(repo, gateway, fast_settings)
+
+
+@pytest.fixture
+def make_agent(registry):
+    from app.agent.llm import MockLLM
+    from app.agent.orchestrator import Agent
+    from app.state.store import RunStore
+
+    def _make(llm=None, max_steps: int = 8):
+        return Agent(llm or MockLLM(), registry, RunStore(), max_steps=max_steps)
+
+    return _make

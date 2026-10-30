@@ -26,6 +26,7 @@ class ErrorCode(StrEnum):
     TIMEOUT = "timeout"
     UNAVAILABLE = "unavailable"
     INVALID_RESPONSE = "invalid_response"
+    REJECTED_BY_OPERATOR = "rejected_by_operator"
     INTERNAL = "internal"
 
 
@@ -109,32 +110,32 @@ class ToolRegistry:
     def _execute(self, name: str, args: dict[str, Any], approved: bool) -> ToolResult:
         tool = self._tools.get(name)
         if tool is None:
-            return _fail(name, ErrorCode.UNKNOWN_TOOL, f"no tool named '{name}'")
+            return failure(name, ErrorCode.UNKNOWN_TOOL, f"no tool named '{name}'")
         if tool.requires_approval and not approved:
-            return _fail(name, ErrorCode.APPROVAL_REQUIRED, f"'{name}' needs operator approval")
+            return failure(name, ErrorCode.APPROVAL_REQUIRED, f"'{name}' needs operator approval")
         try:
             parsed = tool.input_model.model_validate(args)
         except ValidationError as exc:
             msg = "; ".join(f"{'.'.join(map(str, e['loc']))}: {e['msg']}" for e in exc.errors())
-            return _fail(name, ErrorCode.INVALID_ARGUMENTS, msg)
+            return failure(name, ErrorCode.INVALID_ARGUMENTS, msg)
 
         future = self._pool.submit(tool.handler, parsed)
         try:
             data = future.result(timeout=self._timeout)
         except FutureTimeout:
             # The worker thread may still finish later; side-effecting tools must be idempotent.
-            return _fail(name, ErrorCode.TIMEOUT, f"'{name}' timed out after {self._timeout}s")
+            return failure(name, ErrorCode.TIMEOUT, f"'{name}' timed out after {self._timeout}s")
         except ToolFailure as exc:
-            return _fail(name, exc.code, str(exc))
+            return failure(name, exc.code, str(exc))
         except Exception as exc:  # unexpected bug: contain it, log it, never leak a traceback
             log.exception("tool_crashed", extra={"tool": name})
-            return _fail(
+            return failure(
                 name, ErrorCode.INTERNAL, f"internal error in '{name}': {type(exc).__name__}"
             )
         return ToolResult(tool=name, ok=True, data=data)
 
 
-def _fail(tool: str, code: ErrorCode, message: str) -> ToolResult:
+def failure(tool: str, code: ErrorCode, message: str) -> ToolResult:
     return ToolResult(
         tool=tool,
         ok=False,
