@@ -30,7 +30,7 @@ class Settings:
     llm_mode: str = "mock"
     llm_provider: str = "gemini"  # gemini | openrouter
     gemini_api_key: str = ""
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-3.1-flash-lite"
     openrouter_api_key: str = ""
     openrouter_model: str = "nvidia/nemotron-3.5-super-vl:free"
     llm_timeout_seconds: float = 30.0

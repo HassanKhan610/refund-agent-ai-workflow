@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+from decimal import Decimal, InvalidOperation
 from typing import Any
 
 from app.state.models import RunState, StepKind
@@ -27,6 +28,14 @@ def tool_calls(run: RunState) -> list[dict[str, Any]]:
 
 def refund_issued(run: RunState) -> bool:
     return any(r["tool"] == "issue_refund" and r["output"]["ok"] for r in run.tool_results())
+
+
+def _same(actual: Any, expected: str) -> bool:
+    """Compare tool args by value: models may send 40, 40.0 or "40.00" for the same amount."""
+    try:
+        return Decimal(str(actual)) == Decimal(expected)
+    except (InvalidOperation, ValueError):
+        return str(actual) == expected
 
 
 def _is_subsequence(needle: list[str], hay: list[str]) -> bool:
@@ -52,7 +61,7 @@ def tool_accuracy(run: RunState, exp: dict) -> float | None:
         return 0.0
     for tool, want in exp.get("expected_args", {}).items():
         made = [c["arguments"] for c in calls if c["tool"] == tool]
-        if not made or any(str(made[-1].get(k)) != v for k, v in want.items()):
+        if not made or any(not _same(made[-1].get(k), v) for k, v in want.items()):
             return 0.0
     return 1.0
 

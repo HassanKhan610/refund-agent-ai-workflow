@@ -116,3 +116,39 @@ def test_rate_limit_honours_retry_after(monkeypatch):
     c, _ = client_for(httpx.Response(429, headers={"Retry-After": "7"}), ok({"content": "ok"}))
     assert c.complete([], []).content == "ok"
     assert slept == [7.0]
+
+
+def test_provider_extra_is_echoed_back_but_kept_out_of_traces():
+    msg = {
+        "tool_calls": [
+            {
+                "id": "c1",
+                "extra_content": {"google": {"thought_signature": "sig"}},
+                "function": {"name": "lookup_order", "arguments": "{}"},
+            }
+        ]
+    }
+    c, _ = client_for(ok(msg), provider="gemini")
+    resp = c.complete([], [])
+    assert resp.as_message()["tool_calls"][0]["extra_content"] == {
+        "google": {"thought_signature": "sig"}
+    }
+    assert "provider_extra" not in resp.tool_calls[0].model_dump()
+
+
+def test_rate_limit_honours_google_retry_info_body(monkeypatch):
+    slept = []
+    monkeypatch.setattr("app.agent.llm.time.sleep", slept.append)
+    body = [
+        {
+            "error": {
+                "code": 429,
+                "details": [
+                    {"@type": "type.googleapis.com/google.rpc.RetryInfo", "retryDelay": "12s"}
+                ],
+            }
+        }
+    ]
+    c, _ = client_for(httpx.Response(429, json=body), ok({"content": "ok"}), provider="gemini")
+    assert c.complete([], []).content == "ok"
+    assert slept == [12.0]

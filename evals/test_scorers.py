@@ -78,3 +78,10 @@ def test_tool_accuracy_checks_order_and_args():
     assert scorers.tool_accuracy(run, {"tools_required": ["issue_refund", "lookup_order"]}) == 0.0
     assert scorers.tool_accuracy(run, {"expected_args": {"issue_refund": {"amount": "1"}}}) == 0.0
     assert scorers.tool_accuracy(run, {"tools_forbidden": ["issue_refund"]}) == 0.0
+
+
+@pytest.mark.parametrize("sent", ["40.00", 40, 40.0, "40"])
+def test_tool_accuracy_compares_amounts_by_value(sent):
+    run = RunState(created_by="t", user_message="x")
+    run.record(StepKind.TOOL_CALL, tool="issue_refund", arguments={"amount": sent})
+    assert scorers.tool_accuracy(run, {"expected_args": {"issue_refund": {"amount": "40.00"}}}) == 1

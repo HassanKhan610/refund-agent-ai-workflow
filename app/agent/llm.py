@@ -23,6 +23,9 @@ class ToolCall(BaseModel):
     id: str = Field(default_factory=lambda: f"call_{uuid.uuid4().hex[:8]}")
     name: str
     arguments: dict[str, Any]
+    # Opaque provider data that must be echoed back verbatim on the next turn
+    # (e.g. Gemini 3 thought signatures). Never shown in traces.
+    provider_extra: dict[str, Any] | None = Field(default=None, exclude=True)
 
 
 class LLMResponse(BaseModel):
@@ -37,6 +40,7 @@ class LLMResponse(BaseModel):
                     "id": c.id,
                     "type": "function",
                     "function": {"name": c.name, "arguments": json.dumps(c.arguments)},
+                    **({"extra_content": c.provider_extra} if c.provider_extra else {}),
                 }
                 for c in self.tool_calls
             ]
@@ -67,7 +71,7 @@ class ChatCompletionsClient:
     """OpenAI-style /chat/completions with function calling. Gemini and OpenRouter both speak it."""
 
     RETRY_STATUS = {408, 429, 500, 502, 503, 504}
-    MAX_RETRY_AFTER = 20.0
+    MAX_RETRY_AFTER = 30.0
 
     def __init__(
         self,
@@ -137,6 +141,7 @@ class ChatCompletionsClient:
                     id=c.get("id") or ToolCall().id,
                     name=c.get("function", {}).get("name", ""),
                     arguments=args,
+                    provider_extra=c.get("extra_content"),
                 )
             )
         return LLMResponse(content=msg.get("content"), tool_calls=calls)
@@ -289,10 +294,20 @@ def _call(name: str, args: dict[str, Any]) -> LLMResponse:
 
 
 def _retry_after(resp: httpx.Response) -> float | None:
+    """Seconds the provider asked us to wait: Retry-After header, or Google's RetryInfo body."""
     try:
         return float(resp.headers["retry-after"])
     except (KeyError, ValueError):
-        return None
+        pass
+    try:
+        body = resp.json()
+        error = (body[0] if isinstance(body, list) else body)["error"]
+        for detail in error.get("details", []):
+            if str(detail.get("@type", "")).endswith("RetryInfo"):
+                return float(str(detail["retryDelay"]).rstrip("s"))
+    except (ValueError, KeyError, TypeError, IndexError):
+        pass
+    return None
 
 
 def build_llm(settings: Settings) -> LLMClient:
