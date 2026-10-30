@@ -99,7 +99,11 @@ def test_payment_failures_after_approval_are_visible_and_safe(make_agent, repo, 
     gateway.mode = mode
     run = agent.decide(run.id, approve=True, operator="op")
     assert run.status == RunStatus.COMPLETED
-    assert "could not be completed" in run.final_answer and "No money" in run.final_answer
+    assert "could not be completed" in run.final_answer
+    if mode == GatewayMode.TIMEOUT:
+        assert "unknown" in run.final_answer and "No money" not in run.final_answer
+    else:
+        assert "No money" in run.final_answer
     assert repo.get_order("ORD-1001").status == "delivered"
     assert len(gateway.calls) == 1  # side-effecting tool is never auto-retried
 

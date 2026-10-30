@@ -61,14 +61,24 @@ class OpenRouterClient:
     URL = "https://openrouter.ai/api/v1/chat/completions"
     RETRY_STATUS = {408, 429, 500, 502, 503, 504}
 
-    def __init__(self, api_key: str, model: str, timeout: float, max_retries: int = 2) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        model: str,
+        timeout: float,
+        max_retries: int = 2,
+        backoff_seconds: float = 1.0,
+        transport: httpx.BaseTransport | None = None,
+    ) -> None:
         if not api_key:
             raise ValueError("OPENROUTER_API_KEY is required when LLM_MODE=live")
         self.name = f"openrouter:{model}"
         self._model = model
         self._max_retries = max_retries
+        self._backoff = backoff_seconds
         self._http = httpx.Client(
             timeout=timeout,
+            transport=transport,
             headers={"Authorization": f"Bearer {api_key}", "X-Title": "refund-agent"},
         )
 
@@ -89,7 +99,8 @@ class OpenRouterClient:
                 if resp.status_code not in self.RETRY_STATUS:
                     break
             log.warning("llm_retry", extra={"attempt": attempt, "error": last_error})
-            time.sleep(min(2**attempt, 8))
+            if attempt < self._max_retries:
+                time.sleep(min(self._backoff * 2**attempt, 8))
         raise LLMError(last_error)
 
     @staticmethod
@@ -216,6 +227,13 @@ class MockLLM:
             return _say(
                 f"The operator declined the refund for {oid} ({err['message']}). "
                 "No refund was issued."
+            )
+        if err["code"] == "timeout":
+            # A timeout is an ambiguous outcome: the provider may still have paid out.
+            return _say(
+                f"The refund for {oid} could not be completed: the payment provider did not "
+                "respond in time, so the outcome is unknown. Do not retry; finance must "
+                "reconcile with the provider first."
             )
         return _say(
             f"The refund for {oid} could not be completed: {err['message']}. "
