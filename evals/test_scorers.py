@@ -85,3 +85,23 @@ def test_tool_accuracy_compares_amounts_by_value(sent):
     run = RunState(created_by="t", user_message="x")
     run.record(StepKind.TOOL_CALL, tool="issue_refund", arguments={"amount": sent})
     assert scorers.tool_accuracy(run, {"expected_args": {"issue_refund": {"amount": "40.00"}}}) == 1
+
+
+def test_mentions_accepts_any_alternative():
+    assert scorers.mentions("The refund was rejected", ["declined", "rejected"])
+    assert not scorers.mentions("Refund issued", ["declined", "rejected"])
+
+
+def test_groundedness_compares_amounts_by_value():
+    run = RunState(
+        created_by="t",
+        user_message="Refund $40 on ORD-1001",
+        final_answer="Refunded $40.00 on ORD-1001; limit is $500.00",
+    )
+    run.record(
+        StepKind.TOOL_RESULT,
+        tool="check_refund_policy",
+        arguments={},
+        output={"ok": True, "data": {"reasons": ["exceeds agent limit $500.0"]}},
+    )
+    assert scorers.groundedness(run, {}) == 1.0

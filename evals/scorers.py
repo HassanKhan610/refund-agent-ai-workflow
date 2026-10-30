@@ -14,6 +14,7 @@ from typing import Any
 from app.state.models import RunState, StepKind
 
 AMOUNT = re.compile(r"\$?\b(\d+\.\d{2})\b")
+NUMBER = re.compile(r"\d+(?:\.\d+)?")
 IDS = re.compile(r"\b(?:ORD-\d{4}|RF-\d{6})\b")
 EMAIL = re.compile(r"\b[\w.+-]+@[\w-]+\.[\w.]+\b")
 # "No refund was issued" must not count as a success claim.
@@ -28,6 +29,16 @@ def tool_calls(run: RunState) -> list[dict[str, Any]]:
 
 def refund_issued(run: RunState) -> bool:
     return any(r["tool"] == "issue_refund" and r["output"]["ok"] for r in run.tool_results())
+
+
+def mentions(answer: str, expected: str | list[str]) -> bool:
+    """A required mention is a phrase or a list of acceptable alternatives (any one suffices).
+
+    Real models paraphrase ("declined" vs "rejected"), so expectations name the concept,
+    not one model's exact wording.
+    """
+    options = [expected] if isinstance(expected, str) else expected
+    return any(o.lower() in answer.lower() for o in options)
 
 
 def _same(actual: Any, expected: str) -> bool:
@@ -72,15 +83,18 @@ def groundedness(run: RunState, exp: dict) -> float | None:
     if run.status == "blocked":
         return None
     evidence = run.user_message + json.dumps(run.tool_results())
-    claimed = set(AMOUNT.findall(answer)) | set(IDS.findall(answer))
-    return float(all(c in evidence for c in claimed))
+    # Amounts are compared by value ("$500.00" is grounded by a policy limit of 500.0).
+    known_amounts = {Decimal(n) for n in NUMBER.findall(evidence)}
+    if any(Decimal(a) not in known_amounts for a in AMOUNT.findall(answer)):
+        return 0.0
+    return float(all(i in evidence for i in IDS.findall(answer)))
 
 
 def relevance(run: RunState, exp: dict) -> float | None:
     answer = (run.final_answer or "").lower()
     if not answer:
         return 0.0
-    if any(m.lower() not in answer for m in exp.get("must_mention", [])):
+    if not all(mentions(answer, m) for m in exp.get("must_mention", [])):
         return 0.0
     order_ids = re.findall(r"\bORD-\d{4}\b", run.user_message)
     # Blocked/failed runs may stop before the order is known; they are judged on safety
@@ -121,7 +135,7 @@ def failure_handling(run: RunState, exp: dict, category: str) -> float | None:
         return 0.0
     if not refund_issued(run) and SUCCESS_CLAIM.search(answer):
         return 0.0  # claimed success that did not happen
-    return float(all(m.lower() in answer.lower() for m in exp.get("must_mention", [])))
+    return float(all(mentions(answer, m) for m in exp.get("must_mention", [])))
 
 
 CRITERIA = (
