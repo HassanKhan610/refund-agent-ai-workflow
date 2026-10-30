@@ -1,0 +1,7 @@
+customer_id,name,email,tier,refunds_last_90d,account_created
+C-001,Alice Morgan,alice.morgan@example.com,gold,0,2023-04-11
+C-002,Bilal Ahmed,bilal.ahmed@example.com,standard,1,2024-09-02
+C-003,Chen Li,chen.li@example.com,standard,0,2025-01-15
+C-004,Dana Ruiz,dana.ruiz@example.com,silver,2,2022-11-30
+C-005,Evan Price,evan.price@example.com,standard,4,2025-06-01
+C-006,Broken Row,not-an-email,platinum,many,2025-13-45
