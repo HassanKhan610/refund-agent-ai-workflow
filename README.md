@@ -10,7 +10,8 @@ and evaluations.
 
 ```
 140 tests passing + 1 live-model test skipped without a key (unit · integration · API · data validation · browser) · 98% line coverage on app/
-23-case AI eval suite × 3 trials · 6 criteria · 100% pass on the deterministic model
+23-case AI eval suite · 6 criteria · 100% on the deterministic model (3 trials)
+Live Gemini (gemini-3.1-flash-lite): 21 cases × 2 trials · 100% pass, 0 flaky · reports/sample/eval_live.md
 ```
 
 ---
@@ -207,9 +208,14 @@ on a fixed dataset. The same dataset runs against the mock, Gemini or any OpenRo
 - **Evals catch real bugs.** The first run surfaced two: the agent cited an example order ID that
   came from nowhere (groundedness), and a scorer counted "No refund was issued" as a success claim.
   Both were fixed, and the scorer now has its own tests.
+- **Mock-to-live transfer.** The first live Gemini run scored 57% even though task completion and
+  tool accuracy were 1.00. The scorers were overfit to the mock's exact wording ("declined" vs
+  "rejected") and compared amounts as text ("$500.00" vs `500.0`). Required mentions now accept
+  equivalent phrasings, and amounts are compared by value. On re-run, the same model scored 100%. The
+  lesson: a scorer that only ever sees a deterministic double hasn't really been validated.
 
 Reports: `reports/eval_<mode>.md` (summary tables) and `.json` (every trial, plus the full trace
-of the first failing trial per case). A sample is in [`reports/sample/eval_mock.md`](reports/sample/eval_mock.md).
+of the first failing trial per case). Samples: [`eval_mock.md`](reports/sample/eval_mock.md) and the live Gemini run [`eval_live.md`](reports/sample/eval_live.md).
 
 ---
 
@@ -268,8 +274,9 @@ flaky, and a flaky gate gets ignored.
 - Guardrails are regex-based. They catch the obvious attacks and keep false positives low, but they
   aren't a complete defense against prompt injection. The policy re-check and approval gate are
   the real safety net.
-- Rule-based evals measure facts, not tone or helpfulness. The live-model eval hasn't been run in
-  CI here because it needs an API key in repository secrets (`GEMINI_API_KEY`).
+- Rule-based evals measure facts, not tone or helpfulness. The live eval was run locally
+  (2 trials per case, all passing); in CI it needs `GEMINI_API_KEY` in repository secrets. Two
+  trials show stability, not a statistically strong variance estimate; the nightly job uses more.
 - Static API keys; no rate limiting; no audit-log export.
 
 ## What I'd add with more time
