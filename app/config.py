@@ -35,6 +35,7 @@ class Settings:
     max_agent_steps: int = 8
     stale_after_hours: int = 24
     max_auto_refund: float = 500.0
+    enable_fault_injection: bool = True
     reference_time: datetime = field(
         default_factory=lambda: datetime.fromisoformat(DEFAULT_REFERENCE_TIME)
     )
@@ -57,6 +58,7 @@ class Settings:
             openrouter_api_key=env.get("OPENROUTER_API_KEY", ""),
             openrouter_model=env.get("OPENROUTER_MODEL", cls.openrouter_model),
             llm_timeout_seconds=float(env.get("LLM_TIMEOUT_SECONDS", 30)),
+            enable_fault_injection=env.get("ENABLE_FAULT_INJECTION", "true").lower() == "true",
             reference_time=datetime.fromisoformat(ref)
             if ref
             else datetime.fromisoformat(DEFAULT_REFERENCE_TIME).astimezone(UTC),

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Refund Agent – Operator Console</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#1d2330; --muted:#667085; --line:#e4e7ec;
+          --ok:#067647; --warn:#b54708; --bad:#b42318; --accent:#2e5aac; }
+  * { box-sizing: border-box; }
+  body { margin:0; font:14px/1.45 system-ui, -apple-system, Segoe UI, sans-serif; background:var(--bg); color:var(--ink); }
+  header { display:flex; gap:16px; align-items:center; padding:12px 24px; background:var(--card); border-bottom:1px solid var(--line); }
+  header h1 { font-size:16px; margin:0 auto 0 0; }
+  main { display:grid; grid-template-columns: 1.1fr 1fr; gap:16px; padding:16px 24px; max-width:1400px; margin:auto; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; }
+  h2 { font-size:14px; margin:0 0 12px; }
+  table { width:100%; border-collapse:collapse; }
+  td:first-child { white-space:nowrap; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid var(--line); }
+  th { color:var(--muted); font-weight:600; font-size:12px; }
+  td.num { text-align:right; font-variant-numeric: tabular-nums; }
+  textarea { width:100%; min-height:70px; padding:8px; font:inherit; border:1px solid var(--line); border-radius:6px; }
+  button { font:inherit; padding:6px 14px; border-radius:6px; border:1px solid var(--line); background:var(--card); cursor:pointer; }
+  button.primary { background:var(--accent); color:#fff; border-color:var(--accent); }
+  button.approve { background:var(--ok); color:#fff; border-color:var(--ok); }
+  button.reject { color:var(--bad); border-color:var(--bad); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .row { display:flex; gap:8px; align-items:center; margin-top:8px; }
+  .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; font-weight:600; background:var(--line); }
+  .badge.completed { background:#dcfae6; color:var(--ok); }
+  .badge.awaiting_approval { background:#fef0c7; color:var(--warn); }
+  .badge.failed, .badge.blocked { background:#fee4e2; color:var(--bad); }
+  .stale { color:var(--warn); font-weight:600; }
+  .answer { padding:10px; background:var(--bg); border-radius:6px; margin:8px 0; white-space:pre-wrap; }
+  .pending { border:1px solid #fedf89; background:#fffaeb; padding:10px; border-radius:6px; margin:8px 0; }
+  .error { color:var(--bad); }
+  ol.trace { padding-left:20px; margin:8px 0 0; font-size:12px; color:var(--muted); }
+  ol.trace code { color:var(--ink); }
+  .full { grid-column: 1 / -1; }
+  select, input { font:inherit; padding:5px; border:1px solid var(--line); border-radius:6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Refund Agent · Operator Console</h1>
+  <label>Role
+    <select id="role" data-testid="role-select">
+      <option value="dev-operator-key">operator</option>
+      <option value="dev-requester-key">requester</option>
+    </select>
+  </label>
+  <label>Payment gateway
+    <select id="fault" data-testid="fault-select">
+      <option value="ok">ok</option>
+      <option value="timeout">timeout</option>
+      <option value="unavailable">unavailable</option>
+      <option value="invalid_response">invalid response</option>
+    </select>
+  </label>
+</header>
+<main>
+  <section>
+    <h2>Orders <small id="orders-error" class="error"></small></h2>
+    <table data-testid="orders-table">
+      <thead><tr><th>Order</th><th>Item</th><th>Customer</th><th class="num">Amount</th><th>Status</th><th>Delivered</th><th>Data</th></tr></thead>
+      <tbody id="orders"></tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>New request</h2>
+    <form id="run-form">
+      <textarea id="message" data-testid="message-input" maxlength="1000"
+        placeholder="e.g. Please refund order ORD-1001, it arrived damaged."></textarea>
+      <div class="row">
+        <button class="primary" type="submit" data-testid="submit-run">Run agent</button>
+        <span id="form-error" class="error" data-testid="form-error"></span>
+      </div>
+    </form>
+
+    <div id="run" data-testid="run-panel" hidden>
+      <h2 style="margin-top:16px">Run <code id="run-id"></code> <span id="run-status" class="badge" data-testid="run-status"></span></h2>
+      <div id="pending" class="pending" data-testid="pending-action" hidden>
+        <strong>Approval required:</strong> <span id="pending-text"></span>
+        <div class="row">
+          <input id="reject-reason" placeholder="reason (required to reject)" data-testid="reject-reason">
+          <button class="approve" id="approve" data-testid="approve-btn">Approve</button>
+          <button class="reject" id="reject" data-testid="reject-btn">Reject</button>
+        </div>
+      </div>
+      <div id="answer" class="answer" data-testid="final-answer" hidden></div>
+      <details open><summary>Execution trace</summary><ol class="trace" id="trace" data-testid="trace"></ol></details>
+    </div>
+  </section>
+
+  <section class="full">
+    <h2>Recent runs</h2>
+    <table><thead><tr><th>Run</th><th>Status</th><th>Request</th><th>Created</th></tr></thead>
+      <tbody id="runs" data-testid="runs-table"></tbody></table>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const key = () => $("role").value;
+let currentRun = null;
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    ...opts,
+    headers: { "Content-Type": "application/json", "X-API-Key": key(), ...(opts.headers || {}) },
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const d = body.detail;
+    throw new Error(Array.isArray(d) ? d.map((e) => e.msg).join("; ") : d || `HTTP ${res.status}`);
+  }
+  return body;
+}
+
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const day = (iso) => (iso ? iso.slice(0, 10) : "—");
+
+async function loadOrders() {
+  try {
+    const orders = await api("/api/orders");
+    $("orders").innerHTML = orders.map((o) => `
+      <tr data-testid="order-row" data-order-id="${esc(o.order_id)}">
+        <td>${esc(o.order_id)}</td><td>${esc(o.item)}</td><td>${esc(o.customer_id)}</td>
+        <td class="num" data-testid="order-amount">${esc(o.amount_display)}</td>
+        <td data-testid="order-status">${esc(o.status)}</td><td>${day(o.delivered_at)}</td>
+        <td>${o.is_stale ? '<span class="stale" data-testid="stale-flag">stale</span>' : "fresh"}</td>
+      </tr>`).join("");
+    $("orders-error").textContent = "";
+  } catch (e) { $("orders-error").textContent = e.message; }
+}
+
+async function loadRuns() {
+  try {
+    const runs = await api("/api/runs");
+    $("runs").innerHTML = runs.map((r) => `
+      <tr><td><a href="#" data-run="${esc(r.id)}">${esc(r.id)}</a></td>
+      <td><span class="badge ${esc(r.status)}">${esc(r.status)}</span></td>
+      <td>${esc(r.user_message)}</td><td>${esc(r.created_at.slice(11, 19))}</td></tr>`).join("");
+  } catch { $("runs").innerHTML = ""; }
+}
+
+function describe(step) {
+  const d = step.data;
+  switch (step.kind) {
+    case "tool_call": return `call <code>${esc(d.tool)}</code> ${esc(JSON.stringify(d.arguments))}`;
+    case "tool_result": return d.output.ok
+      ? `✓ <code>${esc(d.tool)}</code> (${d.duration_ms} ms)`
+      : `✗ <code>${esc(d.tool)}</code> ${esc(d.output.error.code)}: ${esc(d.output.error.message)}`;
+    case "approval_requested": return `⏸ waiting for operator approval`;
+    case "approval_decision": return `${d.approved ? "approved" : "rejected"} by ${esc(d.operator)} ${esc(d.reason)}`;
+    case "guardrail": return `🛡 guardrail: ${esc(d.category)} ${esc(d.reason || (d.violations || []).join(", "))}`;
+    case "error": return `<span class="error">error: ${esc(d.message)}</span>`;
+    case "llm_call": return `model (${esc(d.model)}) → ${d.tool_calls.length ? d.tool_calls.map((c) => esc(c.name)).join(", ") : "answer"}`;
+    default: return esc(step.kind);
+  }
+}
+
+function renderRun(run) {
+  currentRun = run;
+  $("run").hidden = false;
+  $("run-id").textContent = run.id;
+  $("run-status").textContent = run.status;
+  $("run-status").className = `badge ${run.status}`;
+  const p = run.pending_action;
+  $("pending").hidden = !p;
+  if (p) $("pending-text").textContent = `${p.tool} $${p.arguments.amount} on ${p.arguments.order_id}`;
+  $("answer").hidden = !run.final_answer;
+  $("answer").textContent = run.final_answer || "";
+  $("trace").innerHTML = run.steps.map((s) => `<li>${describe(s)}</li>`).join("");
+}
+
+async function act(fn) {
+  $("form-error").textContent = "";
+  document.querySelectorAll("button").forEach((b) => (b.disabled = true));
+  try { await fn(); } catch (e) { $("form-error").textContent = e.message; }
+  finally {
+    document.querySelectorAll("button").forEach((b) => (b.disabled = false));
+    loadOrders(); loadRuns();
+  }
+}
+
+$("run-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  act(async () => renderRun(await api("/api/runs", { method: "POST", body: JSON.stringify({ message: $("message").value }) })));
+});
+$("approve").addEventListener("click", () =>
+  act(async () => renderRun(await api(`/api/runs/${currentRun.id}/approve`, { method: "POST", body: "{}" }))));
+$("reject").addEventListener("click", () =>
+  act(async () => renderRun(await api(`/api/runs/${currentRun.id}/reject`, { method: "POST", body: JSON.stringify({ reason: $("reject-reason").value }) }))));
+$("runs").addEventListener("click", (e) => {
+  const id = e.target.dataset.run;
+  if (id) { e.preventDefault(); act(async () => renderRun(await api(`/api/runs/${id}`))); }
+});
+$("fault").addEventListener("change", () =>
+  act(async () => api("/api/admin/faults", { method: "POST", body: JSON.stringify({ payment_gateway: $("fault").value }) })));
+$("role").addEventListener("change", () => { loadOrders(); loadRuns(); });
+
+loadOrders(); loadRuns();
+</script>
+</body>
+</html>
