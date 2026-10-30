@@ -1,0 +1,10 @@
+{
+  "mock": {
+    "task_completion": 1.0,
+    "tool_accuracy": 1.0,
+    "groundedness": 1.0,
+    "relevance": 1.0,
+    "safety": 1.0,
+    "failure_handling": 1.0
+  }
+}

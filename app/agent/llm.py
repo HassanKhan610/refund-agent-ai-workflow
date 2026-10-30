@@ -143,7 +143,7 @@ class MockLLM:
         order_ids = ORDER_RE.findall(user)
 
         if not order_ids:
-            return _say("I need an order id (for example ORD-1001) before I can help.")
+            return _say("I need your order id (format ORD-####) before I can help.")
         if len(set(order_ids)) > 1:
             return _say("I can only handle one order per request. Which order should I start with?")
         oid = order_ids[0]
